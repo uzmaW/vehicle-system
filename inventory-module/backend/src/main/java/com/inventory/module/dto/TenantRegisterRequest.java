@@ -30,4 +30,13 @@ public class TenantRegisterRequest {
     private String phone;
 
     private SubscriptionType subscriptionType;
+
+    // Admin user details for the tenant
+    @NotBlank(message = "Admin user name is required")
+    @Size(min = 2, max = 255, message = "Admin name must be between 2 and 255 characters")
+    private String adminName;
+
+    @NotBlank(message = "Admin password is required")
+    @Size(min = 6, max = 100, message = "Password must be between 6 and 100 characters")
+    private String adminPassword;
 }

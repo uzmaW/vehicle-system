@@ -50,7 +50,7 @@ public class TenantAwareRepositoryAspect {
             session.enableFilter(TENANT_FILTER_NAME)
                    .setParameter(TENANT_PARAM_NAME, tenantId);
         } else {
-            log.warn("No tenant context set - tenant filter not enabled");
+            log.debug("No tenant context set - tenant filter not enabled for this request");
         }
     }
 }

@@ -243,6 +243,23 @@ select.form-control {
 .table-actions {
   display: flex;
   gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+}
+
+.page-header h2 {
+  margin-bottom: 0.25rem;
+}
+
+.page-header .btn {
+  flex-shrink: 0;
 }
 
 /* Badges */
@@ -284,6 +301,12 @@ select.form-control {
 }
 
 .alert-error {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.alert-danger {
   background-color: #fee2e2;
   color: #991b1b;
   border: 1px solid #fecaca;
@@ -381,6 +404,10 @@ select.form-control {
   border-top: 1px solid var(--border-color);
 }
 
+.modal-footer .btn {
+  min-width: 80px;
+}
+
 /* Loading Spinner */
 .spinner {
   display: inline-block;
@@ -418,6 +445,12 @@ select.form-control {
 .text-success { color: var(--success-color); }
 .text-danger { color: var(--danger-color); }
 .text-warning { color: var(--warning-color); }
+.button-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
 .font-bold { font-weight: 600; }
 .mt-1 { margin-top: 0.25rem; }
 .mt-2 { margin-top: 0.5rem; }

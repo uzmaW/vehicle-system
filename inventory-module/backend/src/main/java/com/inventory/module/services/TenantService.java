@@ -2,10 +2,15 @@ package com.inventory.module.services;
 
 import com.inventory.module.domain.SubscriptionType;
 import com.inventory.module.domain.Tenant;
+import com.inventory.module.domain.User;
 import com.inventory.module.dto.PagedResponse;
 import com.inventory.module.dto.TenantRegisterRequest;
+import com.inventory.module.dto.TenantRegisterResponse;
 import com.inventory.module.dto.TenantResponse;
+import com.inventory.module.dto.UserResponse;
 import com.inventory.module.repositories.TenantRepository;
+import com.inventory.module.repositories.UserRepository;
+import com.inventory.module.security.UserRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -26,18 +31,19 @@ import java.util.Optional;
 public class TenantService {
 
     private final TenantRepository tenantRepository;
+    private final UserRepository userRepository;
 
     /**
-     * Register a new tenant.
+     * Register a new tenant and create the first TENANT_ADMIN user.
      *
-     * @param request the registration request
-     * @return the created tenant response
+     * @param request the registration request with admin user details
+     * @return the registration response with tenant and admin user
      */
     @Transactional
-    public TenantResponse registerTenant(TenantRegisterRequest request) {
+    public TenantRegisterResponse registerTenant(TenantRegisterRequest request) {
         log.info("Registering new tenant: {}", request.getName());
 
-        // Check if email already exists
+        // Check if email already exists for tenant
         if (tenantRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Email already registered");
         }
@@ -56,7 +62,26 @@ public class TenantService {
         tenant = tenantRepository.save(tenant);
         log.info("Tenant registered successfully with UUID: {}", tenant.getUuid());
 
-        return TenantResponse.fromEntity(tenant);
+        // Create first TENANT_ADMIN user for this tenant
+        User adminUser = User.builder()
+                .name(request.getAdminName())
+                .email(request.getEmail()) // Admin uses tenant email
+                .password(request.getAdminPassword())
+                .tenantId(tenant.getUuid())
+                .role(UserRole.TENANT_ADMIN)
+                .active(true)
+                .build();
+
+        adminUser = userRepository.save(adminUser);
+        log.info("First TENANT_ADMIN created for tenant: {}", tenant.getUuid());
+
+        TenantResponse tenantResponse = TenantResponse.fromEntity(tenant);
+        UserResponse userResponse = UserResponse.fromEntity(adminUser);
+
+        return TenantRegisterResponse.builder()
+                .tenant(tenantResponse)
+                .adminUser(userResponse)
+                .build();
     }
 
     /**

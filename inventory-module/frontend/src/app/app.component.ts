@@ -2,14 +2,14 @@ import { Component } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { TenantService } from './services/tenant.service';
 import { ApiService } from './services/api.service';
-import { NgIf, NgClass, NgFor } from '@angular/common';
+import { NgIf, NgClass, NgFor, SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { SubscriptionType, UserRole } from './models/models';
+import { SubscriptionType, UserRole, LoginRequest } from './models/models';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, NgIf, NgClass, NgFor, FormsModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, NgIf, NgClass, NgFor, FormsModule, SlicePipe],
   template: `
     <div class="app-container">
       <!-- Header -->
@@ -27,11 +27,17 @@ import { SubscriptionType, UserRole } from './models/models';
           </nav>
 
           <div class="tenant-section">
+            <!-- Auth Status -->
+            <div class="auth-status" *ngIf="tenantService.isAuthenticated()">
+              <span class="user-email">{{ tenantService.getUserEmail() }}</span>
+              <button class="btn btn-sm btn-outline" (click)="logout()">Logout</button>
+            </div>
+
             <div class="tenant-info" *ngIf="tenantService.hasTenantContext()">
               <span class="tenant-label">Tenant:</span>
-              <span class="tenant-id">{{ tenantService.getTenantId() }}</span>
+              <span class="tenant-id">{{ tenantService.getTenantId() | slice:0:8 }}...</span>
               <span class="badge" [ngClass]="tenantService.isGlobalAdmin() ? 'badge-premium' : 'badge-basic'">
-                {{ tenantService.isGlobalAdmin() ? 'GLOBAL_ADMIN' : 'STANDARD' }}
+                {{ tenantService.getUserRole() }}
               </span>
             </div>
             <button class="btn btn-outline btn-sm" (click)="showSettings = !showSettings">
@@ -44,6 +50,84 @@ import { SubscriptionType, UserRole } from './models/models';
       <!-- Tenant Settings Panel -->
       <div class="settings-panel" *ngIf="showSettings">
         <div class="container">
+          <!-- Login Form (shown when not authenticated) -->
+          <div class="settings-content" *ngIf="!tenantService.isAuthenticated()">
+            <h3>Login</h3>
+            <p class="text-secondary">Sign in with your email and password.</p>
+
+            <form (ngSubmit)="login()">
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Email</label>
+                  <input
+                    type="email"
+                    class="form-control"
+                    [(ngModel)]="loginForm.email"
+                    name="email"
+                    placeholder="Enter email address"
+                    required
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Password</label>
+                  <input
+                    type="password"
+                    class="form-control"
+                    [(ngModel)]="loginForm.password"
+                    name="password"
+                    placeholder="Enter password"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="button-row">
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                  [disabled]="!loginForm.email || !loginForm.password || loggingIn"
+                >
+                  {{ loggingIn ? 'Signing in...' : 'Sign In' }}
+                </button>
+              </div>
+            </form>
+
+            <div class="alert alert-error" *ngIf="loginError">
+              {{ loginError }}
+            </div>
+
+            <hr />
+          </div>
+
+          <!-- User Info (shown when authenticated) -->
+          <div class="settings-content" *ngIf="tenantService.isAuthenticated()">
+            <h3>Account Info</h3>
+            <div class="user-info-grid">
+              <div class="info-item">
+                <span class="info-label">User ID</span>
+                <span class="info-value">{{ tenantService.getUserId() }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Email</span>
+                <span class="info-value">{{ tenantService.getUserEmail() }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Tenant ID</span>
+                <span class="info-value">{{ tenantService.getTenantId() }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Role</span>
+                <span class="badge" [ngClass]="tenantService.isGlobalAdmin() ? 'badge-premium' : 'badge-basic'">
+                  {{ tenantService.getUserRole() }}
+                </span>
+              </div>
+            </div>
+            <div class="button-row" style="margin-top: 1rem;">
+              <button class="btn btn-outline" (click)="logout()">Logout</button>
+            </div>
+          </div>
+
           <!-- Tenant Registration Form (shown when no tenant is set) -->
           <div class="settings-content" *ngIf="!tenantService.hasTenantContext()">
             <h3>Register Tenant</h3>
@@ -101,7 +185,7 @@ import { SubscriptionType, UserRole } from './models/models';
               </button>
             </div>
 
-            <div class="alert alert-danger" *ngIf="registrationError">
+            <div class="alert alert-error" *ngIf="registrationError">
               {{ registrationError }}
             </div>
 
@@ -249,6 +333,19 @@ import { SubscriptionType, UserRole } from './models/models';
       gap: 1rem;
     }
 
+    .auth-status {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding-right: 0.75rem;
+      border-right: 1px solid var(--border-color);
+    }
+
+    .user-email {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
     .tenant-info {
       display: flex;
       align-items: center;
@@ -279,6 +376,11 @@ import { SubscriptionType, UserRole } from './models/models';
       padding: 1.5rem;
       border-radius: var(--radius-lg);
       box-shadow: var(--shadow-sm);
+      margin-bottom: 1rem;
+    }
+
+    .settings-content:last-child {
+      margin-bottom: 0;
     }
 
     .settings-content h3 {
@@ -287,6 +389,41 @@ import { SubscriptionType, UserRole } from './models/models';
 
     .settings-content p {
       margin-bottom: 1rem;
+    }
+
+    .settings-content hr {
+      margin: 1.5rem 0;
+      border: none;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .settings-content h4 {
+      margin-bottom: 0.5rem;
+    }
+
+    .user-info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+
+    .info-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .info-label {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .info-value {
+      font-size: 0.875rem;
+      font-weight: 500;
+      word-break: break-all;
     }
 
     .main-content {
@@ -311,6 +448,14 @@ export class AppComponent {
 
   showSettings = false;
 
+  // Login form
+  loginForm = {
+    email: '',
+    password: ''
+  };
+  loggingIn = false;
+  loginError = '';
+
   // New tenant registration
   newTenant = {
     name: '',
@@ -325,7 +470,40 @@ export class AppComponent {
   constructor(
     public tenantService: TenantService,
     private apiService: ApiService
-  ) {}
+  ) {
+    // Auto-show settings panel if no tenant context is configured
+    if (!tenantService.hasTenantContext()) {
+      this.showSettings = true;
+    }
+  }
+
+  login(): void {
+    this.loggingIn = true;
+    this.loginError = '';
+
+    this.apiService.login({ email: this.loginForm.email, password: this.loginForm.password }).subscribe({
+      next: (response) => {
+        this.tenantService.setUserFromLogin(response);
+        this.loggingIn = false;
+        this.loginForm = { email: '', password: '' };
+      },
+      error: (err) => {
+        this.loginError = err.error?.message || 'Login failed. Please check your credentials.';
+        this.loggingIn = false;
+      }
+    });
+  }
+
+  logout(): void {
+    if (this.tenantService.isAuthenticated()) {
+      this.apiService.logout().subscribe({
+        next: () => {},
+        error: () => {}
+      });
+    }
+    this.tenantService.clearContext();
+    this.showSettings = false;
+  }
 
   registerTenant(): void {
     this.registering = true;

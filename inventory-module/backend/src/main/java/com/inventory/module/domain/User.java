@@ -1,5 +1,6 @@
 package com.inventory.module.domain;
 
+import com.inventory.module.security.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -7,19 +8,17 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * Tenant Entity representing a tenant organization in the multi-tenant system.
- *
- * Tenants must register through the API before they can access any data.
- * Each tenant has a unique UUID and subscription details.
+ * User Entity representing a user in the system.
+ * Each user belongs to a tenant and has a role.
  */
 @Entity
-@Table(name = "tenants",
+@Table(name = "users",
     indexes = {
-        @Index(name = "idx_tenant_name", columnList = "name")
+        @Index(name = "idx_user_tenant", columnList = "tenant_id")
     },
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_tenant_uuid", columnNames = "uuid"),
-        @UniqueConstraint(name = "uk_tenant_email", columnNames = "email")
+        @UniqueConstraint(name = "uk_user_uuid", columnNames = "uuid"),
+        @UniqueConstraint(name = "uk_user_email", columnNames = "email")
     }
 )
 @Getter
@@ -27,7 +26,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Tenant {
+public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,47 +34,52 @@ public class Tenant {
     private Long id;
 
     /**
-     * Public-facing UUID for tenant identification.
-     * Used in API requests as X-Tenant-Id header.
+     * Public-facing UUID for user identification.
      */
     @Column(name = "uuid", nullable = false, updatable = false, unique = true, length = 36)
     private String uuid;
 
     /**
-     * Tenant organization name.
+     * User's name.
      */
     @Column(name = "name", nullable = false, length = 255)
     private String name;
 
     /**
-     * Contact email - unique per tenant.
+     * User's email - unique per tenant.
      */
-    @Column(name = "email", nullable = false, unique = true, length = 255)
+    @Column(name = "email", nullable = false, length = 255)
     private String email;
 
     /**
-     * Contact phone number.
+     * Password (hashed).
      */
-    @Column(name = "phone", length = 50)
-    private String phone;
+    @Column(name = "password", nullable = false, length = 255)
+    private String password;
 
     /**
-     * Subscription tier.
+     * Tenant ID this user belongs to.
+     */
+    @Column(name = "tenant_id", nullable = false, length = 36)
+    private String tenantId;
+
+    /**
+     * User role in the system.
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "subscription_type", nullable = false, length = 20)
+    @Column(name = "role", nullable = false, length = 20)
     @Builder.Default
-    private SubscriptionType subscriptionType = SubscriptionType.BASIC;
+    private UserRole role = UserRole.STANDARD;
 
     /**
-     * Whether the tenant is active/approved.
+     * Whether the user is active.
      */
     @Column(name = "active", nullable = false)
     @Builder.Default
-    private Boolean active = false;
+    private Boolean active = true;
 
     /**
-     * Registration timestamp.
+     * Creation timestamp.
      */
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

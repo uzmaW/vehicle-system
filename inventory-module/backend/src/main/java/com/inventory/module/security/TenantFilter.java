@@ -52,15 +52,26 @@ public class TenantFilter implements Filter {
         String requestURI = httpRequest.getRequestURI();
         
         // Skip tenant validation for actuator health checks and H2 console
+        // Also skip for user management endpoints (they require GLOBAL_ADMIN/TENANT_ADMIN but no tenant header)
         if (shouldSkipTenantCheck(requestURI, httpRequest.getMethod())) {
-            chain.doFilter(request, response);
+            // Still extract user context for user management endpoints
+            String userId = httpRequest.getHeader(USER_ID_HEADER);
+            String roleHeader = httpRequest.getHeader(USER_ROLE_HEADER);
+            UserRole userRole = parseUserRole(roleHeader);
+            UserContext.setUserContext(userId, userRole);
+
+            try {
+                chain.doFilter(request, response);
+            } finally {
+                UserContext.clear();
+            }
             return;
         }
 
         try {
             // Extract and validate tenant ID
             String tenantId = extractAndValidateTenantId(httpRequest);
-            
+
             // Extract user context (for demo purposes, from headers)
             String userId = httpRequest.getHeader(USER_ID_HEADER);
             String roleHeader = httpRequest.getHeader(USER_ROLE_HEADER);
@@ -70,14 +81,14 @@ public class TenantFilter implements Filter {
             TenantContext.setTenantId(tenantId);
             UserContext.setUserContext(userId, userRole);
 
-            log.debug("Tenant context set: tenantId={}, userId={}, role={}", 
+            log.debug("Tenant context set: tenantId={}, userId={}, role={}",
                      tenantId, userId, userRole);
 
             chain.doFilter(request, response);
 
         } catch (MissingTenantHeaderException e) {
             log.error("Missing tenant header for request: {}", requestURI);
-            sendErrorResponse(httpResponse, HttpServletResponse.SC_BAD_REQUEST, 
+            sendErrorResponse(httpResponse, HttpServletResponse.SC_BAD_REQUEST,
                            "Missing required header: X-Tenant-Id");
         } finally {
             // Always clear context to prevent leakage
@@ -140,8 +151,14 @@ public class TenantFilter implements Filter {
         // Skip for tenant registration and tenant lookup endpoints
         // Also skip OPTIONS (preflight) requests to allow CORS to work
         // Skip Swagger/OpenAPI endpoints
+        // Skip tenant list endpoint for admin access
+        // Skip user management endpoints (require GLOBAL_ADMIN or TENANT_ADMIN but no tenant header)
         return requestURI.startsWith("/api/tenants/register") ||
                requestURI.matches("/api/tenants/[^/]+") ||
+               requestURI.matches("/api/tenants/[^/]+/users") ||
+               requestURI.matches("/api/tenants/[^/]+/users/[^/]+") ||
+               requestURI.equals("/api/tenants") ||
+               requestURI.startsWith("/api/users") ||
                requestURI.startsWith("/actuator") ||
                requestURI.startsWith("/h2-console") ||
                requestURI.startsWith("/swagger-ui") ||

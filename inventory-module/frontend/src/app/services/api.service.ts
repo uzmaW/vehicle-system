@@ -1,7 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { catchError } from 'rxjs/operators';
 import {
   DealerCreateRequest,
   DealerUpdateRequest,
@@ -13,7 +12,9 @@ import {
   PagedResponse,
   SubscriptionCountResponse,
   TenantRegisterRequest,
-  TenantResponse
+  TenantResponse,
+  LoginRequest,
+  LoginResponse
 } from '../models/models';
 
 /**
@@ -179,5 +180,29 @@ export class ApiService {
       `${this.baseUrl}/api/tenants`,
       { params }
     );
+  }
+
+  // ==================== Auth Endpoints ====================
+
+  /**
+   * Login with email and password.
+   * Returns JWT token and user info.
+   */
+  login(request: LoginRequest): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(`${this.baseUrl}/api/auth/login`, request);
+  }
+
+  /**
+   * Logout - invalidates current token.
+   */
+  logout(): Observable<any> {
+    return this.http.post(`${this.baseUrl}/api/auth/logout`, {});
+  }
+
+  /**
+   * Get current user info.
+   */
+  getCurrentUser(): Observable<LoginResponse> {
+    return this.http.get<LoginResponse>(`${this.baseUrl}/api/auth/me`);
   }
 }

@@ -35,7 +35,7 @@ public class OpenApiConfig {
                         .type(SecurityScheme.Type.APIKEY)
                         .in(SecurityScheme.In.HEADER)
                         .name("X-User-Role")
-                        .description("User role: STANDARD or GLOBAL_ADMIN"))
+                        .description("User role: STANDARD, TENANT_ADMIN, or GLOBAL_ADMIN"))
                 .addSecurityItem(new SecurityRequirement()
                         .addList("X-Tenant-Id")
                         .addList("X-User-Id")

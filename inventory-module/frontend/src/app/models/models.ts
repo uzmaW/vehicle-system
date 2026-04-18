@@ -120,3 +120,26 @@ export interface TenantResponse {
   createdAt: string;
   updatedAt: string;
 }
+
+// Auth DTOs
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  tokenType: string;
+  expiresIn: number;
+  userId: string;
+  email: string;
+  tenantId: string;
+  role: UserRole;
+}
+
+export interface AuthUser {
+  userId: string;
+  email: string;
+  tenantId: string;
+  role: UserRole;
+}
