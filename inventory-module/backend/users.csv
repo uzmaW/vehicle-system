@@ -1,0 +1,4 @@
+"id","active","created_at","email","name","password","role","tenant_id","updated_at","uuid"
+"1","true","2026-04-17 17:58:27.328596","globaladmin@system.local","Global Admin","globaladmin123","GLOBAL_ADMIN","00000000-0000-0000-0000-000000000000","2026-04-17 17:58:27.32862","0291564a-5cf7-4b78-94c8-6bca47580826"
+"2","true","2026-04-30 23:17:38.585741","t1@t1.com","admin","admin123","TENANT_ADMIN","8c742f7b-8dea-4fc7-9eb4-1420c283c2ba","2026-04-30 23:17:38.585756","f0b0110e-989c-46a1-89c9-b651827fac3a"
+"3","true","2026-05-07 00:56:28.243049","abc@abc.com","admin","Password123","TENANT_ADMIN","189dc5dc-4a1f-4aa5-9765-880f7b91e431","2026-05-07 00:56:28.243059","d73d4c02-945c-4cf8-a088-cff13d47d459"

@@ -1,0 +1,553 @@
+import { Component } from '@angular/core';
+import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { TenantService } from './services/tenant.service';
+import { ApiService } from './services/api.service';
+import { NgIf, NgClass, NgFor, SlicePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { SubscriptionType, UserRole, LoginRequest } from './models/models';
+
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, NgIf, NgClass, NgFor, FormsModule, SlicePipe],
+  template: `
+    <div class="app-container">
+      <!-- Header -->
+      <header class="header">
+        <div class="container header-content">
+          <div class="logo-section">
+            <h1 class="logo">Inventory Module</h1>
+            <span class="subtitle">Multi-Tenant Management System</span>
+          </div>
+
+          <nav class="nav" *ngIf="tenantService.hasTenantContext()">
+            <a routerLink="/dealers" routerLinkActive="active" class="nav-link">Dealers</a>
+            <a routerLink="/vehicles" routerLinkActive="active" class="nav-link">Vehicles</a>
+            <a routerLink="/users" routerLinkActive="active" class="nav-link" *ngIf="tenantService.isAuthenticated()">Users</a>
+            <a routerLink="/admin" routerLinkActive="active" class="nav-link" *ngIf="tenantService.isGlobalAdmin()">Global Admin</a>
+            <a routerLink="/tenant-admin" routerLinkActive="active" class="nav-link" *ngIf="tenantService.isTenantAdmin()">Tenant Admin</a>
+          </nav>
+
+          <div class="tenant-section">
+            <!-- Auth Status -->
+            <div class="auth-status" *ngIf="tenantService.isAuthenticated()">
+              <span class="user-email">{{ tenantService.getUserEmail() }}</span>
+            </div>
+
+            <div class="tenant-info" *ngIf="tenantService.hasTenantContext()">
+              <span class="tenant-label">Tenant:</span>
+              <span class="tenant-id">{{ tenantService.getTenantId() | slice:0:8 }}...</span>
+              <span class="badge" [ngClass]="tenantService.isGlobalAdmin() ? 'badge-premium' : 'badge-basic'">
+                {{ tenantService.getUserRole() }}
+              </span>
+            </div>
+
+            <!-- Settings Dropdown -->
+            <div class="dropdown" *ngIf="tenantService.hasTenantContext()">
+              <button class="btn btn-outline btn-sm dropdown-toggle" (click)="toggleDropdown()">
+                ⚙️
+              </button>
+              <div class="dropdown-menu" *ngIf="showDropdown">
+                <a class="dropdown-item" (click)="showSettings = true; showDropdown = false">Settings</a>
+                <a class="dropdown-item" routerLink="/admin" *ngIf="tenantService.isGlobalAdmin()">Global Admin</a>
+                <a class="dropdown-item" routerLink="/tenant-admin" *ngIf="tenantService.isTenantAdmin()">Tenant Admin</a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item" (click)="logout()">Logout</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Tenant Settings Panel -->
+      <div class="settings-panel" *ngIf="showSettings">
+        <div class="container">
+          <!-- Account Info (shown when authenticated) -->
+          <div class="settings-content" *ngIf="tenantService.isAuthenticated()">
+            <h3>Account Info</h3>
+            <div class="user-info-grid">
+              <div class="info-item">
+                <span class="info-label">User ID</span>
+                <span class="info-value">{{ tenantService.getUserId() }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Email</span>
+                <span class="info-value">{{ tenantService.getUserEmail() }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Tenant ID</span>
+                <span class="info-value">{{ tenantService.getTenantId() }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Role</span>
+                <span class="badge" [ngClass]="tenantService.isGlobalAdmin() ? 'badge-premium' : 'badge-basic'">
+                  {{ tenantService.getUserRole() }}
+                </span>
+              </div>
+            </div>
+            <div class="button-row" style="margin-top: 1rem;">
+              <button class="btn btn-outline" (click)="logout()">Logout</button>
+            </div>
+            <hr />
+          </div>
+
+          <!-- Tenant Registration Form (shown when no tenant is set) -->
+          <div class="settings-content" *ngIf="!tenantService.hasTenantContext()">
+            <h3>Register Tenant</h3>
+            <p class="text-secondary">Create a new tenant to get started.</p>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Organization Name</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  [(ngModel)]="newTenant.name"
+                  placeholder="Enter organization name"
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Email</label>
+                <input
+                  type="email"
+                  class="form-control"
+                  [(ngModel)]="newTenant.email"
+                  placeholder="Enter email address"
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Phone (Optional)</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  [(ngModel)]="newTenant.phone"
+                  placeholder="Enter phone number"
+                />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Subscription Type</label>
+                <select class="form-control" [(ngModel)]="newTenant.subscriptionType">
+                  <option [ngValue]="SubscriptionType.BASIC">Basic</option>
+                  <option [ngValue]="SubscriptionType.PREMIUM">Premium</option>
+                </select>
+              </div>
+            </div>
+
+            <hr />
+
+            <h4>Admin User</h4>
+            <p class="text-secondary">Create an admin user for this tenant.</p>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Admin Name</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  [(ngModel)]="newTenant.adminName"
+                  placeholder="Enter admin name"
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Admin Password</label>
+                <input
+                  type="password"
+                  class="form-control"
+                  [(ngModel)]="newTenant.adminPassword"
+                  placeholder="Enter password"
+                />
+              </div>
+            </div>
+
+            <div class="button-row">
+              <button
+                class="btn btn-primary"
+                (click)="registerTenant()"
+                [disabled]="!newTenant.name || !newTenant.email || !newTenant.adminName || !newTenant.adminPassword || registering"
+              >
+                {{ registering ? 'Registering...' : 'Register Tenant' }}
+              </button>
+            </div>
+
+            <div class="alert alert-error" *ngIf="registrationError">
+              {{ registrationError }}
+            </div>
+
+            <div class="alert alert-success" *ngIf="registrationSuccess">
+              Tenant registered! UUID: {{ registrationSuccess }}
+            </div>
+
+            <hr />
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="container">
+          <router-outlet></router-outlet>
+        </div>
+      </main>
+
+      <!-- Footer -->
+      <footer class="footer">
+        <div class="container">
+          <p>&copy; 2024 Inventory Management Module - Modular Monolith Architecture</p>
+        </div>
+      </footer>
+    </div>
+  `,
+  styles: [`
+    .app-container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background: white;
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2rem;
+    }
+
+    .logo-section {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .logo {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--primary-color);
+      margin: 0;
+    }
+
+    .subtitle {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .nav {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .nav-link {
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-md);
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.875rem;
+      transition: all var(--transition-fast);
+    }
+
+    .nav-link:hover {
+      color: var(--text-primary);
+      background-color: var(--background-color);
+    }
+
+    .nav-link.active {
+      color: var(--primary-color);
+      background-color: #eff6ff;
+    }
+
+    .tenant-section {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .auth-status {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding-right: 0.75rem;
+      border-right: 1px solid var(--border-color);
+    }
+
+    .user-email {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    .tenant-info {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+    }
+
+    .tenant-label {
+      color: var(--text-secondary);
+    }
+
+    .tenant-id {
+      font-family: monospace;
+      background: var(--background-color);
+      padding: 0.25rem 0.5rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+    }
+
+    .settings-panel {
+      background: #f0f9ff;
+      border-bottom: 1px solid #bae6fd;
+      padding: 1.5rem 0;
+    }
+
+    .settings-content {
+      background: white;
+      padding: 1.5rem;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 1rem;
+    }
+
+    .settings-content:last-child {
+      margin-bottom: 0;
+    }
+
+    .settings-content h3 {
+      margin-bottom: 0.5rem;
+    }
+
+    .settings-content p {
+      margin-bottom: 1rem;
+    }
+
+    .settings-content hr {
+      margin: 1.5rem 0;
+      border: none;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .settings-content h4 {
+      margin-bottom: 0.5rem;
+    }
+
+    .user-info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+
+    .info-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .info-label {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .info-value {
+      font-size: 0.875rem;
+      font-weight: 500;
+      word-break: break-all;
+    }
+
+    .main-content {
+      flex: 1;
+      padding: 2rem 0;
+    }
+
+    .footer {
+      background: white;
+      border-top: 1px solid var(--border-color);
+      padding: 1.5rem 0;
+      text-align: center;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    .dropdown {
+      position: relative;
+    }
+
+    .dropdown-toggle {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1.25rem;
+      padding: 0.25rem 0.5rem;
+    }
+
+    .dropdown-menu {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      background: white;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      min-width: 150px;
+      z-index: 1000;
+    }
+
+    .dropdown-item {
+      display: block;
+      padding: 0.5rem 1rem;
+      color: var(--text-primary);
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .dropdown-item:hover {
+      background: var(--background-color);
+    }
+
+    .dropdown-divider {
+      border-top: 1px solid var(--border-color);
+      margin: 0.25rem 0;
+    }
+  `]
+})
+export class AppComponent {
+  // Expose enums to template
+  SubscriptionType = SubscriptionType;
+  UserRole = UserRole;
+
+showSettings = false;
+  showDropdown = false;
+
+  // Login form
+  loginForm = {
+    email: '',
+    password: ''
+  };
+  loggingIn = false;
+  loginError = '';
+
+  // New tenant registration
+  newTenant = {
+    name: '',
+    email: '',
+    phone: '',
+    subscriptionType: 'BASIC',
+    adminName: '',
+    adminPassword: ''
+  };
+  registering = false;
+  registrationError = '';
+  registrationSuccess = '';
+
+  constructor(
+    public tenantService: TenantService,
+    private apiService: ApiService
+  ) {
+    // Don't auto-show settings - let Home component handle initial setup
+    this.showSettings = false;
+  }
+
+  login(): void {
+    this.loggingIn = true;
+    this.loginError = '';
+
+    this.apiService.login({ email: this.loginForm.email, password: this.loginForm.password }).subscribe({
+      next: (response) => {
+        this.tenantService.setUserFromLogin(response);
+        this.loggingIn = false;
+        this.loginForm = { email: '', password: '' };
+        this.showSettings = false;
+      },
+      error: (err) => {
+        this.loginError = err.error?.message || 'Login failed. Please check your credentials.';
+        this.loggingIn = false;
+      }
+    });
+  }
+
+  toggleDropdown(): void {
+    this.showDropdown = !this.showDropdown;
+  }
+
+  logout(): void {
+    if (this.tenantService.isAuthenticated()) {
+      this.apiService.logout().subscribe({
+        next: () => {},
+        error: () => {}
+      });
+    }
+    this.tenantService.clearContext();
+    this.showSettings = false;
+  }
+
+  registerTenant(): void {
+    this.registering = true;
+    this.registrationError = '';
+    this.registrationSuccess = '';
+
+    this.tenantService.registerTenant({
+      name: this.newTenant.name,
+      email: this.newTenant.email,
+      phone: this.newTenant.phone || undefined,
+      subscriptionType: this.newTenant.subscriptionType as any,
+      adminName: this.newTenant.adminName,
+      adminPassword: this.newTenant.adminPassword
+    }).subscribe({
+      next: (tenant) => {
+        this.registrationSuccess = tenant.uuid;
+        this.registering = false;
+        // Clear form
+        this.newTenant = {
+          name: '',
+          email: '',
+          phone: '',
+          subscriptionType: 'BASIC',
+          adminName: '',
+          adminPassword: ''
+        };
+        // Auto-hide settings after successful registration
+        setTimeout(() => {
+          this.showSettings = false;
+        }, 1500);
+      },
+      error: (err) => {
+        this.registrationError = err.error?.message || 'Registration failed';
+        this.registering = false;
+      }
+    });
+  }
+
+  updateTenantId(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    if (value) {
+      this.tenantService.setTenantId(value);
+      // Auto-hide settings after setting tenant
+      this.showSettings = false;
+    }
+  }
+
+  updateUserId(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    if (value) {
+      this.tenantService.setUserId(value);
+    }
+  }
+
+  updateUserRole(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.tenantService.setUserRole(value);
+  }
+}
